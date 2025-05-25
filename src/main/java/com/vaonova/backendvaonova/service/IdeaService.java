@@ -22,7 +22,8 @@ public class IdeaService implements IIdeaService {
     @Override
     public ResponseAnalizedIdeaDto analizeIdea(RequestIdeaDto idea) {
         Integer RADIUS = 250; //Meters
-        String API_KEY = "AIzaSyAhpEcqgr-tAQlFqkE7Kv2ThiRcRTEaqrc";
+        String API_KEY = System.getenv("API_KEY");
+
         Idea parsedIdea = IdeaMapper.toIdea(idea);
 
         Double lat1 = parsedIdea.getLatitude() + 0.001347;
@@ -125,7 +126,7 @@ public class IdeaService implements IIdeaService {
 
         requestBody.put("locationRestriction", locationRestriction);
 
-        System.out.println(requestBody.toString());
+        System.out.println(apiKey);
 
         // Configurar la conexión HTTP
         URL url = new URL(endpoint);
