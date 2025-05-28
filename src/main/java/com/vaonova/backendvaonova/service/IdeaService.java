@@ -19,53 +19,30 @@ import java.util.List;
 
 @Service
 public class IdeaService implements IIdeaService {
+
     @Override
     public ResponseAnalizedIdeaDto analizeIdea(RequestIdeaDto idea) {
         Integer RADIUS = 250; //Meters
         String API_KEY = System.getenv("API_KEY");
-
         Idea parsedIdea = IdeaMapper.toIdea(idea);
 
         Double lat1 = parsedIdea.getLatitude() + 0.001347;
         Double lon1 = parsedIdea.getLongitude();
-
         Double lat2 = parsedIdea.getLatitude() - 0.001347;
         Double lon2 = parsedIdea.getLongitude();
-
         Double lat3 = parsedIdea.getLatitude();
         Double lon3 = parsedIdea.getLongitude() + 0.001623;
-
         Double lat4 = parsedIdea.getLatitude();
         Double lon4 = parsedIdea.getLongitude() - 0.001623;
 
         List<Business> nearbyBusinesses = new ArrayList<>();
         try {
-                searchNearby(parsedIdea.getBusinessType(), lat1, lon1, RADIUS, API_KEY).forEach(b -> {
-                    if (nearbyBusinesses.stream().noneMatch(b1 -> b1.getLatitude().equals(b.getLatitude()) && b1.getLongitude().equals(b.getLongitude()))) {
-                        nearbyBusinesses.add(b);
-                    }
-                });
-                searchNearby(parsedIdea.getBusinessType(), lat2, lon2, RADIUS, API_KEY).forEach(b -> {
-                    if (nearbyBusinesses.stream().noneMatch(b1 -> b1.getLatitude().equals(b.getLatitude()) && b1.getLongitude().equals(b.getLongitude()))) {
-                        nearbyBusinesses.add(b);
-                    }
-                });
-                searchNearby(parsedIdea.getBusinessType(), lat3, lon3, RADIUS, API_KEY).forEach(b -> {
-                    if (nearbyBusinesses.stream().noneMatch(b1 -> b1.getLatitude().equals(b.getLatitude()) && b1.getLongitude().equals(b.getLongitude()))) {
-                        nearbyBusinesses.add(b);
-                    }
-                });
-                searchNearby(parsedIdea.getBusinessType(), lat4, lon4, RADIUS, API_KEY).forEach(b -> {
-                    if (nearbyBusinesses.stream().noneMatch(b1 -> b1.getLatitude().equals(b.getLatitude()) && b1.getLongitude().equals(b.getLongitude()))) {
-                        nearbyBusinesses.add(b);
-                    }
-                });
+            searchNearby(parsedIdea.getBusinessType(), lat1, lon1, RADIUS, API_KEY).forEach(b -> addIfNotExists(nearbyBusinesses, b));
+            searchNearby(parsedIdea.getBusinessType(), lat2, lon2, RADIUS, API_KEY).forEach(b -> addIfNotExists(nearbyBusinesses, b));
+            searchNearby(parsedIdea.getBusinessType(), lat3, lon3, RADIUS, API_KEY).forEach(b -> addIfNotExists(nearbyBusinesses, b));
+            searchNearby(parsedIdea.getBusinessType(), lat4, lon4, RADIUS, API_KEY).forEach(b -> addIfNotExists(nearbyBusinesses, b));
         } catch (Exception e) {
-            throw new RuntimeException("Error al buscar negocios cercanos", e);
-        }
-
-        for (int i = 0; i < nearbyBusinesses.size(); i++) {
-            System.out.println(nearbyBusinesses.get(i).toString());
+            throw new RuntimeException("Error al buscar negocios cercanos: " + e.getMessage(), e);
         }
 
         Integer total = nearbyBusinesses.size();
@@ -81,15 +58,10 @@ public class IdeaService implements IIdeaService {
 
         Double ratingPromedio = withRating > 0 ? ratingsTotal / withRating : 0;
 
-        // Asignar riesgo (riesgo alto si hay muchas opciones buenas cerca)
         Risk risk = new Risk((int) Math.min(100, total * (ratingPromedio / 5.0) * 10));
-
-        // Score de viabilidad inverso al riesgo, ponderado
         Integer viabilityScore = Math.max(0, 100 - risk.getValue());
 
-        // Recomendaciones simples
         List<String> recommendations = new ArrayList<>();
-
         if (total == 0) {
             recommendations.add("No hay negocios similares cerca. Puede ser una oportunidad.");
         } else if (risk.getValue() > 70) {
@@ -101,10 +73,27 @@ public class IdeaService implements IIdeaService {
         }
 
         Competition competition = new Competition(total);
-
-        AnalizedIdea analizedIdea = new AnalizedIdea(parsedIdea.getLongitude(), parsedIdea.getLatitude(), parsedIdea.getBusinessType(), parsedIdea.getBudget(), risk, competition, viabilityScore, recommendations);
+        AnalizedIdea analizedIdea = new AnalizedIdea(
+                parsedIdea.getLongitude(),
+                parsedIdea.getLatitude(),
+                parsedIdea.getBusinessType(),
+                parsedIdea.getBudget(),
+                risk,
+                competition,
+                viabilityScore,
+                recommendations
+        );
 
         return AnalizedIdeaMapper.toAnalizedIdeaDto(analizedIdea);
+    }
+
+    private void addIfNotExists(List<Business> businesses, Business newBusiness) {
+        boolean exists = businesses.stream().anyMatch(b ->
+                b.getLatitude().equals(newBusiness.getLatitude()) &&
+                b.getLongitude().equals(newBusiness.getLongitude()));
+        if (!exists) {
+            businesses.add(newBusiness);
+        }
     }
 
     private List<Business> searchNearby(BusinessType businessType, Double lat, Double lng, Integer radius, String apiKey) throws Exception {
@@ -126,9 +115,6 @@ public class IdeaService implements IIdeaService {
 
         requestBody.put("locationRestriction", locationRestriction);
 
-        System.out.println(apiKey);
-
-        // Configurar la conexión HTTP
         URL url = new URL(endpoint);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("POST");
@@ -137,13 +123,16 @@ public class IdeaService implements IIdeaService {
         conn.setRequestProperty("X-Goog-FieldMask", "places.displayName,places.location,places.rating");
         conn.setDoOutput(true);
 
-        // Enviar la solicitud
         try (OutputStream os = conn.getOutputStream()) {
             byte[] input = requestBody.toString().getBytes("utf-8");
             os.write(input, 0, input.length);
         }
 
-        // Leer la respuesta
+        int responseCode = conn.getResponseCode();
+        if (responseCode != 200) {
+            throw new RuntimeException("La API respondió con código: " + responseCode);
+        }
+
         StringBuilder response = new StringBuilder();
         try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "utf-8"))) {
             String responseLine;
@@ -152,29 +141,36 @@ public class IdeaService implements IIdeaService {
             }
         }
 
-        System.out.println(response.toString());
-
         return parseBusiness(response.toString());
     }
 
     private List<Business> parseBusiness(String json) {
         List<Business> businesses = new ArrayList<>();
-        JSONObject obj = new JSONObject(json);
-        JSONArray results = obj.getJSONArray("places");
 
+        JSONObject obj = new JSONObject(json);
+        if (!obj.has("places")) return businesses;
+
+        JSONArray results = obj.getJSONArray("places");
         for (int i = 0; i < results.length(); i++) {
             JSONObject place = results.getJSONObject(i);
 
-            String name = place.getJSONObject("displayName").optString("text", "Unknown");
-            JSONObject location = place.getJSONObject("location");
-            Double latitude = location.getDouble("latitude");
-            Double longitude = location.getDouble("longitude");
-            Double rating = place.has("rating") ? place.getDouble("rating") : -1.0;
+            String name = place.optJSONObject("displayName") != null
+                    ? place.getJSONObject("displayName").optString("text", "Unknown")
+                    : "Unknown";
+
+            JSONObject location = place.optJSONObject("location");
+            if (location == null) continue;
+
+            Double latitude = location.optDouble("latitude", Double.NaN);
+            Double longitude = location.optDouble("longitude", Double.NaN);
+
+            if (latitude.isNaN() || longitude.isNaN()) continue;
+
+            Double rating = place.has("rating") ? place.optDouble("rating", -1.0) : -1.0;
 
             businesses.add(new Business(name, latitude, longitude, rating));
         }
 
         return businesses;
     }
-
 }
