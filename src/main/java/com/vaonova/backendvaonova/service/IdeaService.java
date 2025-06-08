@@ -20,6 +20,10 @@ import java.util.List;
 @Service
 public class IdeaService implements IIdeaService {
 
+    private Double CAFE_BUDGET = 10000D;
+    private Double RESTAURANT_BUDGET = 30000D;
+    private Double CONVENIENCE_STORE_BUDGET = 6000D;
+
     @Override
     public ResponseAnalizedIdeaDto analizeIdea(RequestIdeaDto idea) {
         Integer RADIUS = 250; //Meters
@@ -48,18 +52,30 @@ public class IdeaService implements IIdeaService {
         Integer total = nearbyBusinesses.size();
         Double ratingsTotal = 0D;
         Integer withRating = 0;
+        Competition competition = new Competition(0,0,0,0,0);
 
         for (Business n : nearbyBusinesses) {
             if (n.getRating() >= 0) {
                 ratingsTotal += n.getRating();
                 withRating++;
             }
+            if (n.getRating() <= 1.5) {
+                competition.setOneStar(competition.getOneStar() + 1);
+            } else if (n.getRating() <= 2.5) {
+                competition.setTwoStar(competition.getTwoStar() + 1);
+            } else if (n.getRating() <= 3.5) {
+                competition.setThreeStar(competition.getThreeStar() + 1);
+            } else if (n.getRating() <= 4.5) {
+                competition.setFourStar(competition.getFourStar() + 1);
+            } else {
+                competition.setFiveStar(competition.getFiveStar() + 1);
+            }
         }
 
         Double ratingPromedio = withRating > 0 ? ratingsTotal / withRating : 0;
 
-        Risk risk = new Risk((int) Math.min(100, total * (ratingPromedio / 5.0) * 10));
-        Integer viabilityScore = Math.max(0, 100 - risk.getValue());
+        Risk risk = new Risk(calculateRisk(parsedIdea.getBudget(), parsedIdea.getBusinessType()));
+        Integer viabilityScore = (int) Math.max(0, 100 - (risk.getValue() * 0.5));
 
         List<String> recommendations = new ArrayList<>();
         if (total == 0) {
@@ -72,7 +88,7 @@ public class IdeaService implements IIdeaService {
             recommendations.add("Hay competencia, pero la calidad parece baja. Puede ser una oportunidad.");
         }
 
-        Competition competition = new Competition(total);
+
         AnalizedIdea analizedIdea = new AnalizedIdea(
                 parsedIdea.getLongitude(),
                 parsedIdea.getLatitude(),
@@ -172,5 +188,22 @@ public class IdeaService implements IIdeaService {
         }
 
         return businesses;
+    }
+
+    private Integer calculateRisk(Double budget, BusinessType businessType) {
+        Double budgetRecomendado = switch (businessType) {
+            case cafe -> CAFE_BUDGET;
+            case restaurant -> RESTAURANT_BUDGET;
+            case convenience_store -> CONVENIENCE_STORE_BUDGET;
+        };
+
+        if (budgetRecomendado == 0) {
+            return 100;
+        }
+
+        double ratio = budget / budgetRecomendado;
+        int score = (int) Math.round(ratio * 100);
+
+        return Math.max(0, Math.min(100, score));
     }
 }
