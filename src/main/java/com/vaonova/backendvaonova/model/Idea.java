@@ -5,12 +5,14 @@ public class Idea {
     private Double latitude;
     private BusinessType businessType;
     private Double budget;
+    private String description;
 
-    public Idea(Double longitude, Double latitude, BusinessType businessType, Double budget) {
+    public Idea(Double longitude, Double latitude, BusinessType businessType, Double budget, String description) {
         this.longitude = longitude;
         this.latitude = latitude;
         this.businessType = businessType;
         this.budget = budget;
+        this.description = description;
     }
 
     public Double getLongitude() {
@@ -43,5 +45,13 @@ public class Idea {
 
     public void setBudget(Double budget) {
         this.budget = budget;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 }

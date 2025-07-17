@@ -8,8 +8,8 @@ public class AnalizedIdea extends Idea {
     private Integer viabilityScore;
     private List<String> recommendations;
 
-    public AnalizedIdea(Double longitude, Double latitude, BusinessType businessType, Double budget, Risk risk, Competition competition, Integer viabilityScore, List<String> recommendations) {
-        super(longitude, latitude, businessType, budget);
+    public AnalizedIdea(Double longitude, Double latitude, BusinessType businessType, Double budget, Risk risk, String description, Competition competition, Integer viabilityScore, List<String> recommendations) {
+        super(longitude, latitude, businessType, budget, description);
         this.risk = risk;
         this.competition = competition;
         this.viabilityScore = viabilityScore;

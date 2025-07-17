@@ -5,6 +5,6 @@ import com.vaonova.backendvaonova.model.Idea;
 
 public class IdeaMapper {
     public static Idea toIdea(RequestIdeaDto idea) {
-        return new Idea(idea.getLongitude(), idea.getLatitude(), idea.getBusinessType(), idea.getBudget());
+        return new Idea(idea.getLongitude(), idea.getLatitude(), idea.getBusinessType(), idea.getBudget(), idea.getDescription());
     }
 }

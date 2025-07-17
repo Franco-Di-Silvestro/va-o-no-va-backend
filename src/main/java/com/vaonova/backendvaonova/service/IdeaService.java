@@ -10,9 +10,12 @@ import org.json.JSONObject;
 import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.ProtocolException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,9 +23,9 @@ import java.util.List;
 @Service
 public class IdeaService implements IIdeaService {
 
-    private Double CAFE_BUDGET = 10000D;
-    private Double RESTAURANT_BUDGET = 30000D;
-    private Double CONVENIENCE_STORE_BUDGET = 6000D;
+    private Double CAFE_BUDGET = 75000D;
+    private Double RESTAURANT_BUDGET = 130000D;
+    private Double CONVENIENCE_STORE_BUDGET = 40000D;
 
     @Override
     public ResponseAnalizedIdeaDto analizeIdea(RequestIdeaDto idea) {
@@ -77,6 +80,11 @@ public class IdeaService implements IIdeaService {
         Risk risk = new Risk(calculateRisk(parsedIdea.getBudget(), parsedIdea.getBusinessType()));
         Integer viabilityScore = (int) Math.max(0, 100 - (risk.getValue() * 0.5));
 
+        try{
+            viabilityScore = calculateViability(parsedIdea.getLatitude(), parsedIdea.getLongitude(), parsedIdea.getBusinessType(), total, parsedIdea.getDescription());
+        } catch (Exception e) {
+            throw new RuntimeException("Error al calcular la viabilidad: " + e.getMessage(), e);
+        }
         List<String> recommendations = new ArrayList<>();
         if (total == 0) {
             recommendations.add("No hay negocios similares cerca. Puede ser una oportunidad.");
@@ -95,6 +103,7 @@ public class IdeaService implements IIdeaService {
                 parsedIdea.getBusinessType(),
                 parsedIdea.getBudget(),
                 risk,
+                parsedIdea.getDescription(),
                 competition,
                 viabilityScore,
                 recommendations
@@ -205,5 +214,48 @@ public class IdeaService implements IIdeaService {
         int score = (int) Math.round(ratio * 100);
 
         return Math.max(0, Math.min(100, score));
+    }
+
+    private Integer calculateViability(Double lat, Double lng, BusinessType businessType, Integer competitors, String description) throws IOException {
+        URL url = new URL("http://localhost:8000/predict");
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("Content-Type", "application/json");
+        conn.setDoOutput(true);
+
+        JSONObject requestBody = new JSONObject();
+        requestBody.put("latitude", lat);
+        requestBody.put("longitude", lng);
+        requestBody.put("category", businessType.toString());
+        requestBody.put("n_competitors_1km", competitors);
+        requestBody.put("description", description);
+
+        try (OutputStream os = conn.getOutputStream()) {
+            byte[] input = requestBody.toString().getBytes("utf-8");
+            os.write(input, 0, input.length);
+        }
+
+        int responseCode = conn.getResponseCode();
+        if (responseCode != 200) {
+            throw new RuntimeException("La API respondió con código: " + responseCode);
+        }
+
+        StringBuilder response = new StringBuilder();
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "utf-8"))) {
+            String responseLine;
+            while ((responseLine = br.readLine()) != null) {
+                response.append(responseLine.trim());
+            }
+        }
+
+            System.out.println("RESPONSE: " + response.toString());
+//
+//        JSONObject obj = new JSONObject(response.toString());
+//
+//        System.out.println(obj.toString());
+//        System.out.println(obj.getDouble("probability"));
+//        System.out.println(obj.getDouble("probability") * 100);
+
+        return  (int)(Double.parseDouble(response.toString()) * 100);
     }
 }

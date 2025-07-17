@@ -7,12 +7,14 @@ public class RequestIdeaDto {
     private Double latitude;
     private BusinessType businessType;
     private Double budget;
+    private String description;
 
-    public RequestIdeaDto(Double longitude, Double latitude, BusinessType businessType, Double budget) {
+    public RequestIdeaDto(Double longitude, Double latitude, BusinessType businessType, Double budget, String description) {
         this.longitude = longitude;
         this.latitude = latitude;
         this.businessType = businessType;
         this.budget = budget;
+        this.description = description;
     }
 
     public Double getLongitude() {
@@ -45,5 +47,13 @@ public class RequestIdeaDto {
 
     public void setBudget(Double budget) {
         this.budget = budget;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 }
